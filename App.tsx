@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { HashRouter } from 'react-router-dom';
 import SongList from './components/SongList';
@@ -88,9 +87,9 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full bg-gray-900">
         {view === 'list' && (
-          <div className="pb-12">
+          <div className="h-full w-full overflow-y-auto">
             <SongList 
                 songs={songs} 
                 onCreate={handleCreate} 
