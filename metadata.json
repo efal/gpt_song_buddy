@@ -1,0 +1,7 @@
+{
+  "name": "Song Buddy",
+  "description": "Offline-capable lyrics prompter for live performances with audio-triggered scrolling.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
