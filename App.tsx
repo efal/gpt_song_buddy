@@ -45,10 +45,16 @@ const AppContent: React.FC = () => {
     setActiveSong(null);
   };
 
-  // Called when slider changes in list view
+  // Called when slider changes in list view or live mode
   const handleQuickUpdate = async (updatedSong: Song) => {
-    // Optimistic UI update
+    // Optimistic UI update for the list
     setSongs(prev => prev.map(s => s.id === updatedSong.id ? updatedSong : s));
+    
+    // If we are currently viewing this song (Live Mode), update the active state too
+    if (activeSong && activeSong.id === updatedSong.id) {
+        setActiveSong(updatedSong);
+    }
+
     // Persist to DB
     await storageService.saveSong(updatedSong);
   };
@@ -96,6 +102,7 @@ const AppContent: React.FC = () => {
           <LiveMode 
             song={activeSong} 
             onExit={handleExitLive} 
+            onUpdate={handleQuickUpdate}
           />
         )}
     </div>

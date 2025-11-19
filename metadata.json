@@ -1,5 +1,5 @@
 {
-  "name": "Song Buddy",
+  "name": "gpt Song Buddy 2",
   "description": "Offline-capable lyrics prompter for live performances with audio-triggered scrolling.",
   "requestFramePermissions": [
     "microphone"
