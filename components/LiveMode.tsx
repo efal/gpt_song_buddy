@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Song } from '../types';
 import { useAudioMonitor } from '../services/audio';
-import { ArrowLeft, Mic, Play, Maximize2, Minimize2, Type, MoveVertical, Pause, MicOff } from 'lucide-react';
+import { ArrowLeft, Mic, Play, Maximize2, Minimize2, Type, MoveVertical, Pause, MicOff, RotateCcw } from 'lucide-react';
 
 interface LiveModeProps {
   song: Song;
@@ -151,6 +151,15 @@ const LiveMode: React.FC<LiveModeProps> = ({ song, onExit, onUpdate }) => {
       onUpdate({ ...song, [field]: value });
   };
 
+  const handleReset = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (containerRef.current) {
+        containerRef.current.scrollTop = 0;
+        setIsScrolling(false);
+        updateProgressBar();
+    }
+  };
+
   return (
     <div 
       className="fixed inset-0 bg-black text-white z-50 overflow-hidden flex flex-col"
@@ -230,6 +239,14 @@ const LiveMode: React.FC<LiveModeProps> = ({ song, onExit, onUpdate }) => {
                         )}
                     </div>
                 )}
+
+                <button 
+                    onClick={handleReset}
+                    className="p-3 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white rounded-full transition-all"
+                    title="Reset to Start"
+                >
+                    <RotateCcw size={24} />
+                </button>
 
                 <button 
                     onClick={(e) => { e.stopPropagation(); setIsScrolling(!isScrolling); }} 
