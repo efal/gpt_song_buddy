@@ -141,14 +141,18 @@ const LiveMode: React.FC<LiveModeProps> = ({ song, onExit, onUpdate }) => {
   }, [onExit]);
 
   const handleScreenTap = () => {
-    // Tapping stops scrolling if active, otherwise does nothing specific (controls are always visible now)
-    if (isScrolling) {
-        setIsScrolling(false);
-    }
+    // Tapping now toggles scrolling state (Start/Stop)
+    // Browsers typically do not fire 'onClick' if the user dragged/swiped,
+    // so this safely separates swiping (moving text) from tapping (toggling).
+    setIsScrolling(prev => !prev);
   };
 
   const handleSettingChange = (field: keyof Song, value: number) => {
       onUpdate({ ...song, [field]: value });
+  };
+
+  const handleTriggerChange = (value: number) => {
+      onUpdate({ ...song, audioTrigger: { ...song.audioTrigger, threshold: value } });
   };
 
   const handleReset = (e: React.MouseEvent) => {
@@ -162,7 +166,7 @@ const LiveMode: React.FC<LiveModeProps> = ({ song, onExit, onUpdate }) => {
 
   return (
     <div 
-      className="fixed inset-0 bg-black text-white z-50 overflow-hidden flex flex-col"
+      className="fixed inset-0 bg-black text-white z-50 overflow-hidden flex flex-col cursor-pointer"
       onClick={handleScreenTap}
     >
       {/* Progress Bar Sidebar */}
@@ -195,51 +199,20 @@ const LiveMode: React.FC<LiveModeProps> = ({ song, onExit, onUpdate }) => {
       </div>
 
       {/* Top HUD Controls - Transparent & Fade on Hover */}
-      <div className="absolute top-0 left-0 w-full bg-black/10 hover:bg-black/60 transition-colors duration-300 p-4 backdrop-blur-[1px] z-20 group">
+      <div className="absolute top-0 left-0 w-full bg-black/10 hover:bg-black/60 transition-colors duration-300 p-4 backdrop-blur-[1px] z-20 group cursor-auto">
         <div className="flex justify-between items-center max-w-7xl mx-auto opacity-40 group-hover:opacity-100 transition-opacity duration-300">
-            <button onClick={(e) => { e.stopPropagation(); onExit(); }} className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all">
-                <ArrowLeft size={24} />
-            </button>
+            {/* Left: Back & Title */}
+            <div className="flex-1 flex justify-start items-center min-w-0 mr-2">
+                <button onClick={(e) => { e.stopPropagation(); onExit(); }} className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all flex-shrink-0">
+                    <ArrowLeft size={24} />
+                </button>
+                <span className="ml-3 font-bold text-lg text-white/80 truncate select-none pointer-events-none">
+                    {song.title}
+                </span>
+            </div>
 
-            <div className="flex items-center space-x-4">
-                {/* Monitoring Indicator */}
-                <div className="flex items-center space-x-2 bg-black/20 px-4 py-2 rounded-full border border-white/5">
-                    <Mic size={20} className={shouldMonitor ? "text-green-500/70" : "text-white/20"} />
-                    <div className="w-24 h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div 
-                            className={`h-full transition-all duration-75 ${currentDB > song.audioTrigger.threshold ? 'bg-green-500/80' : 'bg-blue-500/50'}`}
-                            style={{ width: `${Math.min(100, Math.max(0, (currentDB + 60) * 2))}%` }} // approximate viz -60db to -10db
-                        />
-                    </div>
-                    <span className="text-xs font-mono w-12 text-right hidden sm:inline-block text-white/50">
-                      {shouldMonitor ? `${Math.round(currentDB)}dB` : 'OFF'}
-                    </span>
-                </div>
-
-                {!isMonitoring ? (
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); setIsMonitoring(true); }}
-                        className="bg-blue-600/30 hover:bg-blue-600/80 text-blue-100/70 hover:text-white px-4 py-2 rounded-lg font-bold flex items-center space-x-2 text-sm sm:text-base transition-all"
-                    >
-                        <span>Arm</span>
-                    </button>
-                ) : (
-                    <div className={`font-bold text-xs sm:text-sm px-3 rounded-lg py-1 border flex items-center space-x-2 transition-all
-                        ${isScrolling 
-                            ? 'text-yellow-500/70 border-yellow-500/20 bg-yellow-900/10' 
-                            : 'text-green-500/70 border-green-500/20 bg-green-900/10 animate-pulse'}`
-                    }>
-                        {isScrolling ? (
-                          <>
-                             <MicOff size={14} />
-                             <span>Paused</span>
-                          </>
-                        ) : (
-                          <span>Listening...</span>
-                        )}
-                    </div>
-                )}
-
+            {/* Center: Main Controls */}
+            <div className="flex-1 flex justify-center items-center space-x-6">
                 <button 
                     onClick={handleReset}
                     className="p-3 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white rounded-full transition-all"
@@ -250,10 +223,44 @@ const LiveMode: React.FC<LiveModeProps> = ({ song, onExit, onUpdate }) => {
 
                 <button 
                     onClick={(e) => { e.stopPropagation(); setIsScrolling(!isScrolling); }} 
-                    className={`p-3 rounded-full transition-all ${isScrolling ? 'bg-red-600/30 text-red-100/70 hover:bg-red-600 hover:text-white' : 'bg-green-600/30 text-green-100/70 hover:bg-green-600 hover:text-white'}`}
+                    className={`p-4 rounded-full shadow-lg transition-all transform hover:scale-105 ${isScrolling ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}
                 >
-                    {isScrolling ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                    {isScrolling ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
                 </button>
+            </div>
+
+            {/* Right: Tools */}
+            <div className="flex-1 flex justify-end items-center space-x-4">
+                {/* Monitoring Indicator */}
+                <div className="flex items-center space-x-2 bg-black/20 px-3 py-2 rounded-full border border-white/5">
+                    <Mic size={18} className={shouldMonitor ? "text-green-500/70" : "text-white/20"} />
+                    <div className="w-16 sm:w-24 h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div 
+                            className={`h-full transition-all duration-75 ${currentDB > song.audioTrigger.threshold ? 'bg-green-500/80' : 'bg-blue-500/50'}`}
+                            style={{ width: `${Math.min(100, Math.max(0, (currentDB + 60) * 2))}%` }} // approximate viz -60db to -10db
+                        />
+                    </div>
+                </div>
+
+                {!isMonitoring ? (
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsMonitoring(true); }}
+                        className="bg-blue-600/30 hover:bg-blue-600/80 text-blue-100/70 hover:text-white px-3 py-2 rounded-lg font-bold text-sm transition-all"
+                    >
+                        Arm
+                    </button>
+                ) : (
+                   <button 
+                       onClick={(e) => { e.stopPropagation(); setIsMonitoring(false); }}
+                       className={`font-bold text-xs px-3 rounded-lg py-1.5 border flex items-center space-x-1 transition-all cursor-pointer hover:bg-white/5
+                        ${isScrolling 
+                            ? 'text-yellow-500/70 border-yellow-500/20 bg-yellow-900/10' 
+                            : 'text-green-500/70 border-green-500/20 bg-green-900/10 animate-pulse'}`
+                       }
+                   >
+                       {isScrolling ? <span>Paused</span> : <span>Listening</span>}
+                   </button>
+                )}
 
                 <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} className="hidden sm:block p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-all">
                     {isFullscreen ? <Minimize2 size={24} /> : <Maximize2 size={24} />}
@@ -263,18 +270,18 @@ const LiveMode: React.FC<LiveModeProps> = ({ song, onExit, onUpdate }) => {
         {error && <div className="text-red-500 text-center mt-2 font-bold text-sm opacity-80">{error}</div>}
       </div>
 
-      {/* Bottom Settings Bar - Transparent & Fade on Hover */}
+      {/* Bottom Settings Bar - Always semi-transparent */}
       <div 
-        className="absolute bottom-0 left-0 w-full bg-black/10 hover:bg-black/80 transition-colors duration-300 p-4 backdrop-blur-[1px] z-20 group"
+        className="absolute bottom-0 left-0 w-full bg-black/60 p-4 backdrop-blur-sm z-20 cursor-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-12 opacity-30 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-6">
             
             {/* Font Size Control */}
-            <div className="flex items-center space-x-4 w-full sm:w-auto">
-                <Type size={20} className="text-white/50" />
-                <div className="flex flex-col flex-1 sm:w-48">
-                    <div className="flex justify-between text-xs text-white/40 mb-1">
+            <div className="flex items-center space-x-3 w-full sm:w-auto flex-1">
+                <Type size={18} className="text-white/50" />
+                <div className="flex flex-col flex-1">
+                    <div className="flex justify-between text-[10px] uppercase tracking-wider text-white/40 mb-1">
                         <span>Size</span>
                         <span>{song.fontsize}px</span>
                     </div>
@@ -288,10 +295,10 @@ const LiveMode: React.FC<LiveModeProps> = ({ song, onExit, onUpdate }) => {
             </div>
 
             {/* Scroll Speed Control */}
-            <div className="flex items-center space-x-4 w-full sm:w-auto">
-                <MoveVertical size={20} className="text-white/50" />
-                <div className="flex flex-col flex-1 sm:w-48">
-                    <div className="flex justify-between text-xs text-white/40 mb-1">
+            <div className="flex items-center space-x-3 w-full sm:w-auto flex-1">
+                <MoveVertical size={18} className="text-white/50" />
+                <div className="flex flex-col flex-1">
+                    <div className="flex justify-between text-[10px] uppercase tracking-wider text-white/40 mb-1">
                         <span>Speed</span>
                         <span>{song.scrollspeed} px/s</span>
                     </div>
@@ -300,6 +307,23 @@ const LiveMode: React.FC<LiveModeProps> = ({ song, onExit, onUpdate }) => {
                         value={song.scrollspeed}
                         onChange={(e) => handleSettingChange('scrollspeed', parseInt(e.target.value))}
                         className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-green-500/70 hover:accent-green-500"
+                    />
+                </div>
+            </div>
+
+            {/* Trigger Sensitivity Control */}
+             <div className="flex items-center space-x-3 w-full sm:w-auto flex-1">
+                <Mic size={18} className="text-white/50" />
+                <div className="flex flex-col flex-1">
+                    <div className="flex justify-between text-[10px] uppercase tracking-wider text-white/40 mb-1">
+                        <span>Trigger</span>
+                        <span>{song.audioTrigger.threshold} dB</span>
+                    </div>
+                    <input 
+                        type="range" min="-80" max="0" step="1"
+                        value={song.audioTrigger.threshold}
+                        onChange={(e) => handleTriggerChange(parseInt(e.target.value))}
+                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-red-500/70 hover:accent-red-500"
                     />
                 </div>
             </div>

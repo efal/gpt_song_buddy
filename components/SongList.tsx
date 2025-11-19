@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef } from 'react';
 import { Song } from '../types';
-import { Music, Play, Edit, Search, Settings, X } from 'lucide-react';
+import { storageService } from '../services/storage';
+import { Music, Play, Edit, Search, Settings, X, Upload, Download, GripVertical, Plus } from 'lucide-react';
 
 interface SongListProps {
   songs: Song[];
@@ -8,16 +10,23 @@ interface SongListProps {
   onPlay: (song: Song) => void;
   onCreate: () => void;
   onUpdate: (song: Song) => void;
+  onReorder: (songs: Song[]) => void;
+  onRefresh: () => void;
 }
 
-const SongList: React.FC<SongListProps> = ({ songs, onEdit, onPlay, onCreate, onUpdate }) => {
+const SongList: React.FC<SongListProps> = ({ songs, onEdit, onPlay, onCreate, onUpdate, onReorder, onRefresh }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+  const dragOverItemIndex = useRef<number | null>(null);
 
   const filteredSongs = songs.filter(s => 
     s.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
     s.lyrics.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  
+  // Only allow reordering if not searching
+  const isReorderable = searchTerm === '';
 
   const toggleSettings = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -29,18 +38,98 @@ const SongList: React.FC<SongListProps> = ({ songs, onEdit, onPlay, onCreate, on
     onUpdate(updatedSong);
   };
 
+  // Drag and Drop Handlers
+  const handleDragStart = (index: number) => {
+    setDraggedItemIndex(index);
+  };
+
+  const handleDragEnter = (index: number) => {
+    dragOverItemIndex.current = index;
+  };
+
+  const handleDragEnd = () => {
+    const draggedIdx = draggedItemIndex;
+    const overIdx = dragOverItemIndex.current;
+
+    if (draggedIdx !== null && overIdx !== null && draggedIdx !== overIdx && isReorderable) {
+        const newSongs = [...songs];
+        const draggedItem = newSongs[draggedIdx];
+        newSongs.splice(draggedIdx, 1);
+        newSongs.splice(overIdx, 0, draggedItem);
+        onReorder(newSongs);
+    }
+
+    setDraggedItemIndex(null);
+    dragOverItemIndex.current = null;
+  };
+
+  // Import/Export Logic
+  const handleExport = async () => {
+    try {
+      const json = await storageService.exportLibrary();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `songbuddy_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Export failed');
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const json = event.target?.result as string;
+        const count = await storageService.importLibrary(json);
+        alert(`Imported ${count} songs.`);
+        onRefresh();
+      } catch (err) {
+        alert('Import failed. Invalid JSON.');
+      }
+    };
+    reader.readAsText(file);
+    // Reset value to allow re-importing same file
+    e.target.value = '';
+  };
+
   return (
-    <div className="max-w-4xl mx-auto w-full p-4">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+    <div className="max-w-4xl mx-auto w-full p-4 pb-20">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-green-400">
           Song Buddy
         </h1>
-        <button 
-          onClick={onCreate}
-          className="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold shadow-lg transition transform hover:scale-105"
-        >
-          + New Song
-        </button>
+        
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+            <label className="p-2.5 bg-gray-800 hover:bg-gray-700 text-blue-400 rounded-lg cursor-pointer transition border border-gray-700" title="Import JSON">
+                <Upload size={20} />
+                <input type="file" accept=".json" className="hidden" onChange={handleImport} />
+            </label>
+            
+            <button 
+                onClick={handleExport}
+                className="p-2.5 bg-gray-800 hover:bg-gray-700 text-green-400 rounded-lg transition border border-gray-700"
+                title="Export Library"
+            >
+                <Download size={20} />
+            </button>
+
+            <button 
+                onClick={onCreate}
+                className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold shadow-lg transition"
+            >
+                <Plus size={20} className="mr-1" /> New Song
+            </button>
+        </div>
       </div>
 
       <div className="relative mb-6">
@@ -61,16 +150,31 @@ const SongList: React.FC<SongListProps> = ({ songs, onEdit, onPlay, onCreate, on
                 <p>No songs found. Create one or import a library.</p>
             </div>
         ) : (
-            filteredSongs.map(song => (
-                <div key={song.id} className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden transition-all duration-200">
+            filteredSongs.map((song, index) => (
+                <div 
+                    key={song.id} 
+                    className={`bg-gray-800 border border-gray-700 rounded-xl overflow-hidden transition-all duration-200 ${draggedItemIndex === index ? 'opacity-50' : ''}`}
+                    draggable={isReorderable}
+                    onDragStart={() => handleDragStart(index)}
+                    onDragEnter={() => handleDragEnter(index)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => e.preventDefault()}
+                >
                     <div className="p-4 flex items-center justify-between">
-                        <div className="flex-1 min-w-0 mr-4 cursor-pointer" onClick={() => onPlay(song)}>
-                            <h3 className="text-lg font-bold text-white truncate">{song.title}</h3>
-                            <div className="flex items-center text-xs text-gray-400 mt-1 space-x-3">
-                                <span className="bg-gray-700 px-2 py-0.5 rounded text-blue-300">{song.scrollspeed} px/s</span>
-                                <span className="bg-gray-700 px-2 py-0.5 rounded text-purple-300">{song.fontsize}px</span>
-                                <span>•</span>
-                                <span>Trig: {song.audioTrigger.threshold}dB</span>
+                        <div className="flex items-center flex-1 min-w-0 mr-4">
+                            {isReorderable && (
+                                <div className="cursor-move text-gray-600 hover:text-gray-400 mr-3 flex-shrink-0" title="Drag to reorder">
+                                    <GripVertical size={20} />
+                                </div>
+                            )}
+                            <div className="cursor-pointer min-w-0" onClick={() => onPlay(song)}>
+                                <h3 className="text-lg font-bold text-white truncate">{song.title}</h3>
+                                <div className="flex items-center text-xs text-gray-400 mt-1 space-x-3">
+                                    <span className="bg-gray-700 px-2 py-0.5 rounded text-blue-300">{song.scrollspeed} px/s</span>
+                                    <span className="bg-gray-700 px-2 py-0.5 rounded text-purple-300">{song.fontsize}px</span>
+                                    <span>•</span>
+                                    <span>Trig: {song.audioTrigger.threshold}dB</span>
+                                </div>
                             </div>
                         </div>
                         <div className="flex items-center space-x-1">

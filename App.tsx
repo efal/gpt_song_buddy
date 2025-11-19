@@ -1,9 +1,9 @@
+
 import React, { useEffect, useState } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import SongList from './components/SongList';
 import SongEditor from './components/SongEditor';
 import LiveMode from './components/LiveMode';
-import ImportExport from './components/ImportExport';
 import { storageService } from './services/storage';
 import { Song } from './types';
 
@@ -59,6 +59,20 @@ const AppContent: React.FC = () => {
     await storageService.saveSong(updatedSong);
   };
 
+  const handleReorder = async (newOrderSongs: Song[]) => {
+    // Update local state immediately for UI responsiveness
+    setSongs(newOrderSongs);
+
+    // Update order property on all songs and persist
+    // We assume the new array index is the desired order
+    const updates = newOrderSongs.map((song, index) => {
+        const updated = { ...song, order: index };
+        return storageService.saveSong(updated);
+    });
+
+    await Promise.all(updates);
+  };
+
   const handleCloseEditor = () => {
     setView('list');
     setActiveSong(null);
@@ -83,10 +97,9 @@ const AppContent: React.FC = () => {
                 onEdit={handleEdit} 
                 onPlay={handlePlay} 
                 onUpdate={handleQuickUpdate}
+                onReorder={handleReorder}
+                onRefresh={refreshSongs}
             />
-            <div className="max-w-4xl mx-auto px-4 mt-8 pb-12">
-                 <ImportExport onRefresh={refreshSongs} />
-            </div>
           </div>
         )}
 

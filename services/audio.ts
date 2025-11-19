@@ -10,6 +10,39 @@ export const useAudioMonitor = (enabled: boolean, thresholdDB: number) => {
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const thresholdRef = useRef(thresholdDB);
+
+  // Update ref when prop changes so the animation loop sees the new value
+  useEffect(() => {
+    thresholdRef.current = thresholdDB;
+  }, [thresholdDB]);
+
+  const analyze = useCallback(() => {
+    if (!analyserRef.current) return;
+
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Float32Array(bufferLength);
+    analyserRef.current.getFloatTimeDomainData(dataArray);
+
+    // Calculate RMS (Root Mean Square)
+    let sumSquares = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      sumSquares += dataArray[i] * dataArray[i];
+    }
+    const rms = Math.sqrt(sumSquares / bufferLength);
+    
+    // Convert to Decibels
+    // Use a small epsilon to avoid log(0) = -Infinity
+    const db = 20 * Math.log10(Math.max(rms, 1e-7));
+    
+    setCurrentDB(db);
+
+    if (db > thresholdRef.current) {
+        setTriggered(true);
+    }
+
+    animationFrameRef.current = requestAnimationFrame(analyze);
+  }, []);
 
   const startMonitoring = useCallback(async () => {
     try {
@@ -41,7 +74,7 @@ export const useAudioMonitor = (enabled: boolean, thresholdDB: number) => {
       console.error("Microphone access denied or error", err);
       setError("Microphone access denied.");
     }
-  }, []);
+  }, [analyze]);
 
   const stopMonitoring = useCallback(() => {
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
@@ -63,36 +96,6 @@ export const useAudioMonitor = (enabled: boolean, thresholdDB: number) => {
         audioContextRef.current.suspend();
     }
   }, []);
-
-  const analyze = () => {
-    if (!analyserRef.current) return;
-
-    const bufferLength = analyserRef.current.frequencyBinCount;
-    const dataArray = new Float32Array(bufferLength);
-    analyserRef.current.getFloatTimeDomainData(dataArray);
-
-    // Calculate RMS (Root Mean Square)
-    let sumSquares = 0;
-    for (let i = 0; i < bufferLength; i++) {
-      sumSquares += dataArray[i] * dataArray[i];
-    }
-    const rms = Math.sqrt(sumSquares / bufferLength);
-    
-    // Convert to Decibels
-    // Use a small epsilon to avoid log(0) = -Infinity
-    const db = 20 * Math.log10(Math.max(rms, 1e-7));
-    
-    setCurrentDB(db);
-
-    if (db > thresholdDB) {
-        setTriggered(true);
-        // Once triggered, we can keep monitoring or stop if we just wanted a single trigger.
-        // The prompt implies scrolling starts. We continue monitoring to show levels if needed, 
-        // but the boolean `triggered` stays true.
-    }
-
-    animationFrameRef.current = requestAnimationFrame(analyze);
-  };
 
   useEffect(() => {
     if (enabled) {

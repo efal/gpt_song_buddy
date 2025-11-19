@@ -1,3 +1,4 @@
+
 import localforage from 'localforage';
 import { Song, SongLibrary } from '../types';
 
@@ -15,7 +16,16 @@ export const storageService = {
     await localforage.iterate((value: Song) => {
       songs.push(value);
     });
-    return songs.sort((a, b) => a.title.localeCompare(b.title));
+    // Sort by custom order first (playlist), then by title
+    return songs.sort((a, b) => {
+      const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
+      
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return a.title.localeCompare(b.title);
+    });
   },
 
   async getSong(id: string): Promise<Song | null> {

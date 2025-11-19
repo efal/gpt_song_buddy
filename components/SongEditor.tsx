@@ -91,7 +91,7 @@ const SongEditor: React.FC<SongEditorProps> = ({ existingSong, onClose, onSave }
             <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">Audio Trigger ({formData.audioTrigger.threshold} dB)</label>
                 <input 
-                    type="range" min="-80" max="-10" step="5"
+                    type="range" min="-80" max="0" step="1"
                     value={formData.audioTrigger.threshold}
                     onChange={e => handleTriggerChange('threshold', parseInt(e.target.value))}
                     className="w-full accent-red-500"

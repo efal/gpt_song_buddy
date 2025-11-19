@@ -1,3 +1,4 @@
+
 export interface AudioTriggerConfig {
   threshold: number; // dB value, e.g., -40
 }
@@ -9,6 +10,7 @@ export interface Song {
   fontsize: number; // px
   scrollspeed: number; // pixels per second
   audioTrigger: AudioTriggerConfig;
+  order?: number; // For playlist sorting
   createdAt: number;
 }
 
